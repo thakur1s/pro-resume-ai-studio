@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,16 @@ const ResumeBuilder = () => {
   const [atsScore, setAtsScore] = useState(78);
   const [isOptimized, setIsOptimized] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+
+  // Get template from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateId = urlParams.get('template');
+    if (templateId) {
+      setSelectedTemplate(parseInt(templateId));
+    }
+  }, []);
 
   // Mock data for demonstration
   const [resumeData, setResumeData] = useState({
@@ -110,36 +120,77 @@ const ResumeBuilder = () => {
 
                   <TabsContent value="basic" className="space-y-6 mt-6">
                     <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Full Name</label>
-                        <Input placeholder="Enter your full name" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Email</label>
-                        <Input type="email" placeholder="your.email@example.com" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Phone</label>
-                        <Input placeholder="+1 (555) 123-4567" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Location</label>
-                        <Input placeholder="City, State" />
-                      </div>
-                    </div>
-                    
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">LinkedIn Profile</label>
-                      <Input placeholder="https://linkedin.com/in/yourprofile" />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Professional Summary</label>
-                      <Textarea 
-                        placeholder="Write a compelling summary of your professional background..."
-                        rows={4}
+                      <label className="text-sm font-medium">Full Name</label>
+                      <Input 
+                        placeholder="Enter your full name"
+                        value={resumeData.personalInfo.name}
+                        onChange={(e) => setResumeData(prev => ({
+                          ...prev,
+                          personalInfo: { ...prev.personalInfo, name: e.target.value }
+                        }))}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email</label>
+                      <Input 
+                        type="email" 
+                        placeholder="your.email@example.com"
+                        value={resumeData.personalInfo.email}
+                        onChange={(e) => setResumeData(prev => ({
+                          ...prev,
+                          personalInfo: { ...prev.personalInfo, email: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Phone</label>
+                      <Input 
+                        placeholder="+1 (555) 123-4567"
+                        value={resumeData.personalInfo.phone}
+                        onChange={(e) => setResumeData(prev => ({
+                          ...prev,
+                          personalInfo: { ...prev.personalInfo, phone: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Location</label>
+                      <Input 
+                        placeholder="City, State"
+                        value={resumeData.personalInfo.location}
+                        onChange={(e) => setResumeData(prev => ({
+                          ...prev,
+                          personalInfo: { ...prev.personalInfo, location: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    </div>
+                    
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">LinkedIn Profile</label>
+                    <Input 
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      value={resumeData.personalInfo.linkedin}
+                      onChange={(e) => setResumeData(prev => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, linkedin: e.target.value }
+                      }))}
+                    />
+                  </div>
+                    
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Professional Summary</label>
+                    <Textarea 
+                      placeholder="Write a compelling summary of your professional background..."
+                      rows={4}
+                      value={resumeData.personalInfo.summary}
+                      onChange={(e) => setResumeData(prev => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, summary: e.target.value }
+                      }))}
+                    />
+                  </div>
                   </TabsContent>
 
                   <TabsContent value="experience" className="space-y-6 mt-6">
@@ -237,12 +288,46 @@ const ResumeBuilder = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full h-12 border-dashed hover-lift">
+                <input
+                  type="file"
+                  id="resume-upload"
+                  accept=".pdf,.docx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      console.log('Resume uploaded:', file.name);
+                      // AI integration point for resume parsing
+                    }
+                  }}
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 border-dashed hover-lift"
+                  onClick={() => document.getElementById('resume-upload')?.click()}
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Existing Resume
                 </Button>
                 
-                <Button variant="outline" className="w-full h-12 border-dashed hover-lift">
+                <input
+                  type="file"
+                  id="job-upload"
+                  accept=".pdf,.docx,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      console.log('Job description uploaded:', file.name);
+                      // AI integration point for job description parsing
+                    }
+                  }}
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 border-dashed hover-lift"
+                  onClick={() => document.getElementById('job-upload')?.click()}
+                >
                   <FileText className="w-4 h-4 mr-2" />
                   Upload Job Description
                 </Button>
@@ -318,8 +403,29 @@ const ResumeBuilder = () => {
                 </div>
                 
                 <div className="flex space-x-2">
-                  <Input placeholder="Ask me anything..." className="text-sm" />
-                  <Button size="sm" className="gradient-primary text-white">
+                  <Input 
+                    placeholder="Ask me anything..." 
+                    className="text-sm"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        console.log('AI query:', (e.target as HTMLInputElement).value);
+                        // AI integration point for chat
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }}
+                  />
+                  <Button 
+                    size="sm" 
+                    className="gradient-primary text-white"
+                    onClick={() => {
+                      const input = document.querySelector('input[placeholder="Ask me anything..."]') as HTMLInputElement;
+                      if (input?.value) {
+                        console.log('AI query:', input.value);
+                        // AI integration point for chat
+                        input.value = '';
+                      }
+                    }}
+                  >
                     <MessageSquare className="w-4 h-4" />
                   </Button>
                 </div>

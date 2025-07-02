@@ -15,6 +15,7 @@ import template7 from '@/assets/template-7.jpg';
 import template8 from '@/assets/template-8.jpg';
 import template9 from '@/assets/template-9.jpg';
 import template10 from '@/assets/template-10.jpg';
+import template11 from '@/assets/template-11.jpg';
 
 const templates = [
   {
@@ -106,10 +107,19 @@ const templates = [
     popular: false,
     atsScore: 96,
     description: "International business standard"
+  },
+  {
+    id: 11,
+    name: "LaTeX Academic",
+    category: "Academic",
+    image: template11,
+    popular: true,
+    atsScore: 97,
+    description: "Clean LaTeX-style academic format"
   }
 ];
 
-const categories = ["All", "Professional", "Executive", "Creative", "Technology", "Business"];
+const categories = ["All", "Professional", "Executive", "Creative", "Technology", "Business", "Academic"];
 
 const TemplateShowcase = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -184,9 +194,11 @@ const TemplateShowcase = () => {
                         <Eye className="w-4 h-4 mr-1" />
                         Preview
                       </Button>
-                      <Button size="sm" className="gradient-primary text-white">
-                        <Download className="w-4 h-4 mr-1" />
-                        Use
+                      <Button size="sm" className="gradient-primary text-white" asChild>
+                        <a href={`/builder?template=${template.id}`}>
+                          <Download className="w-4 h-4 mr-1" />
+                          Use
+                        </a>
                       </Button>
                     </div>
                   </div>
