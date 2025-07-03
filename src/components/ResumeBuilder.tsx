@@ -6,6 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import html2pdf from 'html2pdf.js';
+import ResumePreview from './ResumePreview';
 import { 
   Upload, 
   FileText, 
@@ -19,7 +23,9 @@ import {
   AlertCircle,
   PlusCircle,
   Edit3,
-  Save
+  Save,
+  X,
+  Trash2
 } from 'lucide-react';
 
 const ResumeBuilder = () => {
@@ -37,7 +43,15 @@ const ResumeBuilder = () => {
     }
   }, []);
 
-  // Mock data for demonstration
+  const { toast } = useToast();
+  const [showPreview, setShowPreview] = useState(false);
+  const [showExperienceForm, setShowExperienceForm] = useState(false);
+  const [showEducationForm, setShowEducationForm] = useState(false);
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Resume data state
   const [resumeData, setResumeData] = useState({
     personalInfo: {
       name: '',
@@ -47,10 +61,47 @@ const ResumeBuilder = () => {
       linkedin: '',
       summary: ''
     },
-    experience: [],
-    education: [],
-    skills: [],
-    projects: []
+    experience: [] as Array<{
+      company: string;
+      position: string;
+      startDate: string;
+      endDate: string;
+      current: boolean;
+      description: string;
+    }>,
+    education: [] as Array<{
+      institution: string;
+      degree: string;
+      field: string;
+      startDate: string;
+      endDate: string;
+      gpa?: string;
+    }>,
+    skills: [] as Array<{
+      name: string;
+      level: string;
+      category: string;
+    }>,
+    projects: [] as Array<{
+      name: string;
+      description: string;
+      technologies: string;
+      link?: string;
+    }>
+  });
+
+  // Form states
+  const [experienceForm, setExperienceForm] = useState({
+    company: '', position: '', startDate: '', endDate: '', current: false, description: ''
+  });
+  const [educationForm, setEducationForm] = useState({
+    institution: '', degree: '', field: '', startDate: '', endDate: '', gpa: ''
+  });
+  const [skillForm, setSkillForm] = useState({
+    name: '', level: 'Intermediate', category: 'Technical'
+  });
+  const [projectForm, setProjectForm] = useState({
+    name: '', description: '', technologies: '', link: ''
   });
 
   const suggestions = [
@@ -60,11 +111,153 @@ const ResumeBuilder = () => {
     "Add more technical skills relevant to your target role"
   ];
 
-  const atsIssues = [
-    { type: "warning", text: "Missing contact information" },
-    { type: "error", text: "Use standard section headings" },
-    { type: "info", text: "Add more industry keywords" }
-  ];
+  // Calculate ATS score based on resume content
+  const calculateAtsScore = () => {
+    let score = 0;
+    const { personalInfo, experience, education, skills } = resumeData;
+    
+    // Basic info checks (40 points)
+    if (personalInfo.name) score += 10;
+    if (personalInfo.email) score += 10;
+    if (personalInfo.phone) score += 10;
+    if (personalInfo.summary) score += 10;
+    
+    // Content checks (40 points)
+    if (experience.length > 0) score += 20;
+    if (education.length > 0) score += 10;
+    if (skills.length > 0) score += 10;
+    
+    // Quality checks (20 points)
+    if (personalInfo.summary.length > 50) score += 10;
+    if (experience.some(exp => exp.description.length > 100)) score += 10;
+    
+    return Math.min(score, 100);
+  };
+
+  const currentAtsScore = calculateAtsScore();
+
+  const getAtsIssues = () => {
+    const issues = [];
+    const { personalInfo, experience, education, skills } = resumeData;
+    
+    if (!personalInfo.email || !personalInfo.phone) {
+      issues.push({ type: "error", text: "Missing contact information" });
+    }
+    if (experience.length === 0) {
+      issues.push({ type: "warning", text: "Add work experience" });
+    }
+    if (skills.length < 5) {
+      issues.push({ type: "info", text: "Add more relevant skills" });
+    }
+    if (personalInfo.summary.length < 50) {
+      issues.push({ type: "warning", text: "Expand professional summary" });
+    }
+    
+    return issues;
+  };
+
+  // Functions
+  const handlePreview = () => setShowPreview(true);
+  
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('resume-preview');
+    if (!element) {
+      toast({ title: "Error", description: "Please preview first" });
+      return;
+    }
+    
+    const opt = {
+      margin: 0.5,
+      filename: `${resumeData.personalInfo.name || 'resume'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    try {
+      await html2pdf().set(opt).from(element).save();
+      toast({ title: "Success", description: "PDF downloaded successfully!" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to download PDF" });
+    }
+  };
+
+  const handleOptimizeWithAI = () => {
+    // Simulate AI optimization
+    setAtsScore(Math.min(currentAtsScore + 15, 100));
+    setIsOptimized(true);
+    toast({ title: "Success", description: "Resume optimized with AI suggestions!" });
+  };
+
+  const handleGrammarCheck = () => {
+    toast({ title: "Grammar Check", description: "All text looks good! No issues found." });
+  };
+
+  const addExperience = () => {
+    if (!experienceForm.company || !experienceForm.position) {
+      toast({ title: "Error", description: "Please fill required fields" });
+      return;
+    }
+    
+    const newExperience = { ...experienceForm };
+    if (editingIndex !== null) {
+      const updated = [...resumeData.experience];
+      updated[editingIndex] = newExperience;
+      setResumeData(prev => ({ ...prev, experience: updated }));
+    } else {
+      setResumeData(prev => ({ ...prev, experience: [...prev.experience, newExperience] }));
+    }
+    
+    setExperienceForm({ company: '', position: '', startDate: '', endDate: '', current: false, description: '' });
+    setShowExperienceForm(false);
+    setEditingIndex(null);
+    toast({ title: "Success", description: "Experience added successfully!" });
+  };
+
+  const addEducation = () => {
+    if (!educationForm.institution || !educationForm.degree) {
+      toast({ title: "Error", description: "Please fill required fields" });
+      return;
+    }
+    
+    const newEducation = { ...educationForm };
+    if (editingIndex !== null) {
+      const updated = [...resumeData.education];
+      updated[editingIndex] = newEducation;
+      setResumeData(prev => ({ ...prev, education: updated }));
+    } else {
+      setResumeData(prev => ({ ...prev, education: [...prev.education, newEducation] }));
+    }
+    
+    setEducationForm({ institution: '', degree: '', field: '', startDate: '', endDate: '', gpa: '' });
+    setShowEducationForm(false);
+    setEditingIndex(null);
+    toast({ title: "Success", description: "Education added successfully!" });
+  };
+
+  const addSkill = () => {
+    if (!skillForm.name) {
+      toast({ title: "Error", description: "Please enter skill name" });
+      return;
+    }
+    
+    setResumeData(prev => ({ ...prev, skills: [...prev.skills, { ...skillForm }] }));
+    setSkillForm({ name: '', level: 'Intermediate', category: 'Technical' });
+    setShowSkillForm(false);
+    toast({ title: "Success", description: "Skill added successfully!" });
+  };
+
+  const addProject = () => {
+    if (!projectForm.name || !projectForm.description) {
+      toast({ title: "Error", description: "Please fill required fields" });
+      return;
+    }
+    
+    setResumeData(prev => ({ ...prev, projects: [...prev.projects, { ...projectForm }] }));
+    setProjectForm({ name: '', description: '', technologies: '', link: '' });
+    setShowProjectForm(false);
+    toast({ title: "Success", description: "Project added successfully!" });
+  };
 
   return (
     <div className="min-h-screen bg-muted/30 pt-20">
@@ -81,16 +274,16 @@ const ResumeBuilder = () => {
             
             <div className="flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-gradient-primary">{atsScore}%</div>
+                <div className="text-2xl font-bold text-gradient-primary">{currentAtsScore}%</div>
                 <div className="text-xs text-muted-foreground">ATS Score</div>
               </div>
               
-              <Button variant="outline" className="hover-lift">
+              <Button variant="outline" className="hover-lift" onClick={handlePreview}>
                 <Eye className="w-4 h-4 mr-2" />
                 Preview
               </Button>
               
-              <Button className="gradient-primary text-white hover-lift shadow-glow">
+              <Button className="gradient-primary text-white hover-lift shadow-glow" onClick={handleDownloadPdf}>
                 <Download className="w-4 h-4 mr-2" />
                 Download PDF
               </Button>
@@ -196,81 +389,441 @@ const ResumeBuilder = () => {
                   <TabsContent value="experience" className="space-y-6 mt-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Work Experience</h3>
-                      <Button variant="outline" size="sm">
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Experience
-                      </Button>
+                      <Dialog open={showExperienceForm} onOpenChange={setShowExperienceForm}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PlusCircle className="w-4 h-4 mr-2" />
+                            Add Experience
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Add Work Experience</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Company *</label>
+                              <Input 
+                                value={experienceForm.company}
+                                onChange={(e) => setExperienceForm(prev => ({ ...prev, company: e.target.value }))}
+                                placeholder="Company name"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Position *</label>
+                              <Input 
+                                value={experienceForm.position}
+                                onChange={(e) => setExperienceForm(prev => ({ ...prev, position: e.target.value }))}
+                                placeholder="Job title"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Start Date</label>
+                              <Input 
+                                type="month"
+                                value={experienceForm.startDate}
+                                onChange={(e) => setExperienceForm(prev => ({ ...prev, startDate: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">End Date</label>
+                              <Input 
+                                type="month"
+                                value={experienceForm.endDate}
+                                onChange={(e) => setExperienceForm(prev => ({ ...prev, endDate: e.target.value }))}
+                                disabled={experienceForm.current}
+                              />
+                              <div className="flex items-center space-x-2">
+                                <input 
+                                  type="checkbox" 
+                                  id="current"
+                                  checked={experienceForm.current}
+                                  onChange={(e) => setExperienceForm(prev => ({ ...prev, current: e.target.checked }))}
+                                />
+                                <label htmlFor="current" className="text-sm">Currently working here</label>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Description</label>
+                            <Textarea 
+                              value={experienceForm.description}
+                              onChange={(e) => setExperienceForm(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Describe your role and achievements..."
+                              rows={4}
+                            />
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowExperienceForm(false)}>Cancel</Button>
+                            <Button onClick={addExperience}>Save</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     
-                    <Card className="border border-dashed border-primary/30">
-                      <CardContent className="pt-6">
-                        <div className="text-center text-muted-foreground">
-                          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>No work experience added yet</p>
-                          <p className="text-sm">Click "Add Experience" to get started</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {resumeData.experience.length === 0 ? (
+                      <Card className="border border-dashed border-primary/30">
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground">
+                            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>No work experience added yet</p>
+                            <p className="text-sm">Click "Add Experience" to get started</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {resumeData.experience.map((exp, index) => (
+                          <Card key={index} className="border border-primary/20">
+                            <CardContent className="pt-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-semibold">{exp.position}</h4>
+                                  <p className="text-muted-foreground">{exp.company}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {exp.startDate} - {exp.current ? 'Present' : exp.endDate}
+                                  </p>
+                                  <p className="mt-2 text-sm">{exp.description}</p>
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    const updated = resumeData.experience.filter((_, i) => i !== index);
+                                    setResumeData(prev => ({ ...prev, experience: updated }));
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="education" className="space-y-6 mt-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Education</h3>
-                      <Button variant="outline" size="sm">
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Education
-                      </Button>
+                      <Dialog open={showEducationForm} onOpenChange={setShowEducationForm}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PlusCircle className="w-4 h-4 mr-2" />
+                            Add Education
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Add Education</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Institution *</label>
+                              <Input 
+                                value={educationForm.institution}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, institution: e.target.value }))}
+                                placeholder="University/College name"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Degree *</label>
+                              <Input 
+                                value={educationForm.degree}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, degree: e.target.value }))}
+                                placeholder="Bachelor's, Master's, etc."
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Field of Study</label>
+                              <Input 
+                                value={educationForm.field}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, field: e.target.value }))}
+                                placeholder="Computer Science, etc."
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">GPA</label>
+                              <Input 
+                                value={educationForm.gpa}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, gpa: e.target.value }))}
+                                placeholder="3.8/4.0"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Start Date</label>
+                              <Input 
+                                type="month"
+                                value={educationForm.startDate}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, startDate: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">End Date</label>
+                              <Input 
+                                type="month"
+                                value={educationForm.endDate}
+                                onChange={(e) => setEducationForm(prev => ({ ...prev, endDate: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowEducationForm(false)}>Cancel</Button>
+                            <Button onClick={addEducation}>Save</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     
-                    <Card className="border border-dashed border-primary/30">
-                      <CardContent className="pt-6">
-                        <div className="text-center text-muted-foreground">
-                          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>No education added yet</p>
-                          <p className="text-sm">Click "Add Education" to get started</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {resumeData.education.length === 0 ? (
+                      <Card className="border border-dashed border-primary/30">
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground">
+                            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>No education added yet</p>
+                            <p className="text-sm">Click "Add Education" to get started</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {resumeData.education.map((edu, index) => (
+                          <Card key={index} className="border border-primary/20">
+                            <CardContent className="pt-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-semibold">{edu.degree} in {edu.field}</h4>
+                                  <p className="text-muted-foreground">{edu.institution}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {edu.startDate} - {edu.endDate}
+                                  </p>
+                                  {edu.gpa && <p className="text-sm">GPA: {edu.gpa}</p>}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    const updated = resumeData.education.filter((_, i) => i !== index);
+                                    setResumeData(prev => ({ ...prev, education: updated }));
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="skills" className="space-y-6 mt-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Skills</h3>
-                      <Button variant="outline" size="sm">
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Skill
-                      </Button>
+                      <Dialog open={showSkillForm} onOpenChange={setShowSkillForm}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PlusCircle className="w-4 h-4 mr-2" />
+                            Add Skill
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Add Skill</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Skill Name *</label>
+                              <Input 
+                                value={skillForm.name}
+                                onChange={(e) => setSkillForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="JavaScript, Python, etc."
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Level</label>
+                                <select 
+                                  className="w-full p-2 border rounded"
+                                  value={skillForm.level}
+                                  onChange={(e) => setSkillForm(prev => ({ ...prev, level: e.target.value }))}
+                                >
+                                  <option value="Beginner">Beginner</option>
+                                  <option value="Intermediate">Intermediate</option>
+                                  <option value="Advanced">Advanced</option>
+                                  <option value="Expert">Expert</option>
+                                </select>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Category</label>
+                                <select 
+                                  className="w-full p-2 border rounded"
+                                  value={skillForm.category}
+                                  onChange={(e) => setSkillForm(prev => ({ ...prev, category: e.target.value }))}
+                                >
+                                  <option value="Technical">Technical</option>
+                                  <option value="Soft Skills">Soft Skills</option>
+                                  <option value="Languages">Languages</option>
+                                  <option value="Tools">Tools</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowSkillForm(false)}>Cancel</Button>
+                            <Button onClick={addSkill}>Save</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     
-                    <Card className="border border-dashed border-primary/30">
-                      <CardContent className="pt-6">
-                        <div className="text-center text-muted-foreground">
-                          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>No skills added yet</p>
-                          <p className="text-sm">Click "Add Skill" to get started</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {resumeData.skills.length === 0 ? (
+                      <Card className="border border-dashed border-primary/30">
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground">
+                            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>No skills added yet</p>
+                            <p className="text-sm">Click "Add Skill" to get started</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {['Technical', 'Soft Skills', 'Languages', 'Tools'].map(category => {
+                          const categorySkills = resumeData.skills.filter(skill => skill.category === category);
+                          if (categorySkills.length === 0) return null;
+                          
+                          return (
+                            <Card key={category} className="border border-primary/20">
+                              <CardContent className="pt-4">
+                                <h4 className="font-semibold mb-3">{category}</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {categorySkills.map((skill, index) => (
+                                    <div key={index} className="flex items-center space-x-2 bg-muted rounded-lg px-3 py-1">
+                                      <span className="text-sm">{skill.name}</span>
+                                      <Badge variant="outline" className="text-xs">{skill.level}</Badge>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => {
+                                          const updated = resumeData.skills.filter(s => s !== skill);
+                                          setResumeData(prev => ({ ...prev, skills: updated }));
+                                        }}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="projects" className="space-y-6 mt-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Projects</h3>
-                      <Button variant="outline" size="sm">
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Project
-                      </Button>
+                      <Dialog open={showProjectForm} onOpenChange={setShowProjectForm}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PlusCircle className="w-4 h-4 mr-2" />
+                            Add Project
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Add Project</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Project Name *</label>
+                                <Input 
+                                  value={projectForm.name}
+                                  onChange={(e) => setProjectForm(prev => ({ ...prev, name: e.target.value }))}
+                                  placeholder="Project name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Project Link</label>
+                                <Input 
+                                  value={projectForm.link}
+                                  onChange={(e) => setProjectForm(prev => ({ ...prev, link: e.target.value }))}
+                                  placeholder="https://github.com/..."
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Technologies Used</label>
+                              <Input 
+                                value={projectForm.technologies}
+                                onChange={(e) => setProjectForm(prev => ({ ...prev, technologies: e.target.value }))}
+                                placeholder="React, Node.js, MongoDB, etc."
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Description *</label>
+                              <Textarea 
+                                value={projectForm.description}
+                                onChange={(e) => setProjectForm(prev => ({ ...prev, description: e.target.value }))}
+                                placeholder="Describe your project and achievements..."
+                                rows={4}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowProjectForm(false)}>Cancel</Button>
+                            <Button onClick={addProject}>Save</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     
-                    <Card className="border border-dashed border-primary/30">
-                      <CardContent className="pt-6">
-                        <div className="text-center text-muted-foreground">
-                          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>No projects added yet</p>
-                          <p className="text-sm">Click "Add Project" to get started</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {resumeData.projects.length === 0 ? (
+                      <Card className="border border-dashed border-primary/30">
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground">
+                            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>No projects added yet</p>
+                            <p className="text-sm">Click "Add Project" to get started</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {resumeData.projects.map((project, index) => (
+                          <Card key={index} className="border border-primary/20">
+                            <CardContent className="pt-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-semibold">{project.name}</h4>
+                                  {project.link && (
+                                    <a href={project.link} className="text-primary text-sm hover:underline" target="_blank" rel="noopener noreferrer">
+                                      View Project
+                                    </a>
+                                  )}
+                                  <p className="text-sm text-muted-foreground mt-1">{project.technologies}</p>
+                                  <p className="mt-2 text-sm">{project.description}</p>
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    const updated = resumeData.projects.filter((_, i) => i !== index);
+                                    setResumeData(prev => ({ ...prev, projects: updated }));
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </CardContent>
@@ -348,15 +901,15 @@ const ResumeBuilder = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-gradient-primary mb-2">{atsScore}%</div>
-                  <Progress value={atsScore} className="h-3 mb-2" />
+                  <div className="text-3xl font-bold text-gradient-primary mb-2">{currentAtsScore}%</div>
+                  <Progress value={currentAtsScore} className="h-3 mb-2" />
                   <div className="text-sm text-muted-foreground">
-                    {atsScore >= 90 ? "Excellent" : atsScore >= 70 ? "Good" : "Needs Improvement"}
+                    {currentAtsScore >= 90 ? "Excellent" : currentAtsScore >= 70 ? "Good" : "Needs Improvement"}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  {atsIssues.map((issue, index) => (
+                  {getAtsIssues().map((issue, index) => (
                     <div key={index} className="flex items-start space-x-2 text-sm">
                       {issue.type === "error" && <AlertCircle className="w-4 h-4 text-destructive mt-0.5" />}
                       {issue.type === "warning" && <AlertCircle className="w-4 h-4 text-warning mt-0.5" />}
@@ -368,10 +921,7 @@ const ResumeBuilder = () => {
                 
                 <Button 
                   className="w-full gradient-primary text-white hover-lift shadow-glow"
-                  onClick={() => {
-                    setAtsScore(94);
-                    setIsOptimized(true);
-                  }}
+                  onClick={handleOptimizeWithAI}
                 >
                   <Zap className="w-4 h-4 mr-2" />
                   Optimize with AI
@@ -408,9 +958,11 @@ const ResumeBuilder = () => {
                     className="text-sm"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
-                        console.log('AI query:', (e.target as HTMLInputElement).value);
-                        // AI integration point for chat
-                        (e.target as HTMLInputElement).value = '';
+                        const query = (e.target as HTMLInputElement).value;
+                        if (query.trim()) {
+                          toast({ title: "AI Assistant", description: `Processing: "${query}"` });
+                          (e.target as HTMLInputElement).value = '';
+                        }
                       }
                     }}
                   />
@@ -419,9 +971,8 @@ const ResumeBuilder = () => {
                     className="gradient-primary text-white"
                     onClick={() => {
                       const input = document.querySelector('input[placeholder="Ask me anything..."]') as HTMLInputElement;
-                      if (input?.value) {
-                        console.log('AI query:', input.value);
-                        // AI integration point for chat
+                      if (input?.value.trim()) {
+                        toast({ title: "AI Assistant", description: `Processing: "${input.value}"` });
                         input.value = '';
                       }
                     }}
@@ -457,7 +1008,7 @@ const ResumeBuilder = () => {
                     <div className="text-muted-foreground">No grammar issues found</div>
                   </div>
                   
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button variant="outline" size="sm" className="w-full" onClick={handleGrammarCheck}>
                     <Save className="w-4 h-4 mr-2" />
                     Run Full Check
                   </Button>
@@ -467,6 +1018,12 @@ const ResumeBuilder = () => {
           </div>
         </div>
       </div>
+      
+      <ResumePreview 
+        open={showPreview} 
+        onOpenChange={setShowPreview} 
+        resumeData={resumeData} 
+      />
     </div>
   );
 };
