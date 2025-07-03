@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import ResumePreview from './ResumePreview';
+import ATSScoreChecker from './ATSScoreChecker';
+import { ResumeData } from '@shared/schema';
 import { 
   Upload, 
   FileText, 
@@ -134,7 +136,12 @@ const ResumeBuilder = () => {
     return Math.min(score, 100);
   };
 
-  const currentAtsScore = calculateAtsScore();
+  const [currentAtsScore, setCurrentAtsScore] = useState(calculateAtsScore());
+
+  // Update ATS score when resume data changes
+  useEffect(() => {
+    setCurrentAtsScore(calculateAtsScore());
+  }, [resumeData]);
 
   const getAtsIssues = () => {
     const issues = [];
@@ -303,12 +310,13 @@ const ResumeBuilder = () => {
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-5">
+                  <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="basic">Basic Info</TabsTrigger>
                     <TabsTrigger value="experience">Experience</TabsTrigger>
                     <TabsTrigger value="education">Education</TabsTrigger>
                     <TabsTrigger value="skills">Skills</TabsTrigger>
                     <TabsTrigger value="projects">Projects</TabsTrigger>
+                    <TabsTrigger value="ats">ATS Check</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="basic" className="space-y-6 mt-6">
@@ -824,6 +832,16 @@ const ResumeBuilder = () => {
                         ))}
                       </div>
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="ats" className="space-y-6 mt-6">
+                    <ATSScoreChecker 
+                      resumeData={resumeData}
+                      onAnalysisComplete={(analysis) => {
+                        // Update the ATS score when analysis is complete
+                        setCurrentAtsScore(analysis.overallScore);
+                      }}
+                    />
                   </TabsContent>
                 </Tabs>
               </CardContent>
