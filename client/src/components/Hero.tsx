@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Star, CheckCircle, Zap, Target, Award } from 'lucide-react';
+import { Link } from 'wouter';
 import heroImage from '@/assets/hero-image.jpg';
 
 const Hero = () => {
@@ -68,10 +69,10 @@ const Hero = () => {
                 className="gradient-primary text-white hover-lift shadow-glow group"
                 asChild
               >
-                <a href="/builder">
+                <Link href="/builder">
                   Start Building Free
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </a>
+                </Link>
               </Button>
               <Button 
                 variant="outline" 

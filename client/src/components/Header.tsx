@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, FileText, Brain, Users, Phone } from 'lucide-react';
+import { Link } from 'wouter';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -51,7 +52,7 @@ const Header = () => {
               Sign In
             </Button>
             <Button className="gradient-primary text-white hover-lift shadow-glow" asChild>
-              <a href="/builder">Start Building</a>
+              <Link href="/builder">Start Building</Link>
             </Button>
           </div>
 
@@ -89,7 +90,7 @@ const Header = () => {
                   Sign In
                 </Button>
                 <Button className="w-full gradient-primary text-white" asChild>
-                  <a href="/builder">Start Building</a>
+                  <Link href="/builder">Start Building</Link>
                 </Button>
               </div>
             </nav>
